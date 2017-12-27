@@ -16,7 +16,7 @@ public class SocketIoConfig {
     /**
      * socket服务器的地址
      */
-    public static final String CHAT_SERVER_URL = "http://120.78.229.100:2120";
+    public static final String SERVER_URL = "http://120.78.229.100:2120";
     /**
      * Socket Log
      */

@@ -2,6 +2,7 @@ package cn.com.tianyudg.socketiodemo.socket_io;
 
 import android.app.Service;
 import android.content.Intent;
+import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
@@ -11,6 +12,9 @@ import org.json.JSONObject;
 
 import java.net.URISyntaxException;
 
+import cn.com.tianyudg.socketiodemo.MainActivity;
+import cn.com.tianyudg.socketiodemo.bean.LoginBean;
+import cn.com.tianyudg.socketiodemo.bean.LoginInfoBean;
 import cn.com.tianyudg.socketiodemo.config.SocketIoConfig;
 import cn.com.tianyudg.socketiodemo.util.LogUtils;
 import cn.com.tianyudg.socketiodemo.util.MathUtils;
@@ -32,32 +36,57 @@ public class SocketService extends Service {
     private static final String TAG = "SocketService";
     Socket mSocket;
     Handler handler;
-    private String socketRandomCode;
 
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
+    private LoginBean loginBean;
+    private LoginInfoBean loginInfoBean;
+    private String socketUserId;
+
+    private MainActivity currentActivity;
+
+
+    public void setCurrentActivity(MainActivity currentActivity) {
+        this.currentActivity = currentActivity;
     }
+
+    public MainActivity getCurrentActivity() {
+        return currentActivity;
+    }
+
 
     @Override
     public void onCreate() {
         super.onCreate();
         handler = new Handler();
-        initSocket();
+        LogUtils.e(" SocketService - - - onCreate");
 
     }
 
     @Override
+    public IBinder onBind(Intent intent) {
+        LogUtils.e(" SocketService - - - onBind");
+        loginBean = (LoginBean) (intent.getSerializableExtra(MainActivity.KEY_LOGIN_BEAN));
+        loginInfoBean = (LoginInfoBean) (intent.getSerializableExtra(MainActivity.KEY_LOGIN_INFO_BEAN));
+        initSocket();
+        return new MyBinder();
+    }
+
+
+
+    @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        LogUtils.e(" SocketService - - - onStartCommand");
         return START_REDELIVER_INTENT;
     }
 
 
+    /**
+     * 初始化Socket并连接
+     */
     private void initSocket() {
 
         if (mSocket == null) {
             try {
-                mSocket = IO.socket(SocketIoConfig.CHAT_SERVER_URL);
+                mSocket = IO.socket(SocketIoConfig.SERVER_URL);
             } catch (URISyntaxException e) {
                 throw new RuntimeException("socket地址有问题" + e.toString());
             }
@@ -76,6 +105,9 @@ public class SocketService extends Service {
     }
 
 
+    /**
+     * Socket断开连接
+     */
     private void disConnect() {
 
         if (mSocket == null) {
@@ -93,28 +125,36 @@ public class SocketService extends Service {
         mSocket.off(SocketIoConfig.EVENT.NEW_MSG_FROM_CLIENT, onNewMessageListener);
     }
 
+
     private Emitter.Listener onConnectListener = new Emitter.Listener() {
         @Override
         public void call(Object... args) {
-                socketLogin();
+
+            LogUtils.e(" Socket连接的监听 - - -  onConnectListener  args.toString() = " + args.toString());
+            socketLogin(loginBean, loginInfoBean);
         }
     };
-
 
 
     /*
      * socket登录
      */
-    private void socketLogin() {
+    private void socketLogin(LoginBean loginBean, LoginInfoBean loginInfoBean) {
 
-        socketRandomCode = MathUtils.generateRandomStr(5);
+        if (loginBean == null || loginInfoBean == null) {
+            LogUtils.e("loginBean == null||loginInfoBean==null");
+            return;
+        }
 
-//        String userId = LoginUtils.getUserMsg().get(2) + "_" + socketRandomCode;
-//        String userName = LoginUtils.getUserMsg().get(0);//Account
-//        String userPassword = LoginUtils.getUserMsg().get(1);
+        String socketRandomCode = MathUtils.generateRandomStr(5);
+        socketUserId = loginBean.data.compangy_id + "_" + socketRandomCode;
+        String userName = loginInfoBean.account;
+        String userPassword = loginInfoBean.psw;
+
+        LogUtils.e("socketUserId="+socketUserId+"-- userName= "+userName+" --- userPassword= "+userPassword);
 
 //        具体的登录方法
-//        mSocket.emit(SocketIoConfig.EVENT.LOGIN, SocketUtil.login(userId, userName, userPassword));
+        mSocket.emit(SocketIoConfig.EVENT.LOGIN, SocketUtil.login(socketUserId, userName, userPassword));
 
     }
 
@@ -122,12 +162,9 @@ public class SocketService extends Service {
     /**
      * 发送重新连接
      */
-//    private void socketReconnect() {
-//        String socketRandom = SocketUtils.getSocketRandomNUm();
-        //具体的重连方法
-//        mSocket.emit(SocketIoConfig.EVENT.RECONNECT, SocketUtil.reconnect(companyId));
-//    }
-
+    private void socketReconnect(String socketUserId) {
+        mSocket.emit(SocketIoConfig.EVENT.RECONNECT, SocketUtil.reconnect(socketUserId));
+    }
 
 
     /**
@@ -136,8 +173,7 @@ public class SocketService extends Service {
     private Emitter.Listener loginSucceedListener = new Emitter.Listener() {
         @Override
         public void call(Object... args) {
-
-            String msg = (String) args[0];
+            LogUtils.e(" Socket登录成功的服务的监听 - - -  loginSucceedListener  args.toString() = " + args.toString());
 
         }
     };
@@ -149,9 +185,10 @@ public class SocketService extends Service {
     private Emitter.Listener onDisconnectListener = new Emitter.Listener() {
         @Override
         public void call(Object... args) {
-
+            LogUtils.e(" 断开Socket服务的监听 - - -  onDisconnectListener  args.toString() = " + args.toString());
         }
     };
+
 
 
     /**
@@ -160,7 +197,9 @@ public class SocketService extends Service {
     private Emitter.Listener onConnectErrorListener = new Emitter.Listener() {
         @Override
         public void call(Object... args) {
-
+            LogUtils.e(" 连接异常的监听 - - -  onConnectErrorListener  args.toString() = " + args.toString());
+            socketReconnect(socketUserId);
+            LogUtils.e(" socketUserId = " + socketUserId);
         }
     };
 
@@ -172,8 +211,9 @@ public class SocketService extends Service {
     private Emitter.Listener onNewMessageListener = new Emitter.Listener() {
         @Override
         public void call(final Object... args) {
-            final String newMsg = (String) args[0];
 
+            final String newMsg = args[0].toString();
+            LogUtils.e(" 新的消息的监听 - - -  onNewMessageListener  anewMsg = " + newMsg);
 
             handler.post(new Runnable() {
                 @Override
@@ -187,6 +227,8 @@ public class SocketService extends Service {
 
 
     private void parseJsonData(String socketJosonMsg) {
+
+        getCurrentActivity().onSocketMsgArrive(socketJosonMsg);
 
         //        {
         //            "event": "connect_callback",
@@ -247,14 +289,29 @@ public class SocketService extends Service {
     }
 
 
+
+
+    public class MyBinder extends Binder {
+        public SocketService getSocketService() {
+            return SocketService.this;
+        }
+    }
+
+
     @Override
     public void onDestroy() {
-        super.onDestroy();
+
         if (handler != null) {
             handler.removeCallbacksAndMessages(null);
+            handler=null;
         }
         disConnect();
+        super.onDestroy();
+        LogUtils.e("SocketService   onDestroy");
     }
+
+
+
 
 
 }

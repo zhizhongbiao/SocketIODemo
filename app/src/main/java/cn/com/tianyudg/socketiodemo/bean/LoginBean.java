@@ -1,12 +1,14 @@
 package cn.com.tianyudg.socketiodemo.bean;
 
+import java.io.Serializable;
+
 /**
  * Author : WaterFlower.
  * Created on 2017/12/26.
  * Desc :
  */
 
-public class LoginBean {
+public class LoginBean implements Serializable{
 
     /**
      * status : 1
@@ -26,7 +28,7 @@ public class LoginBean {
     public int count;
     public int page_count;
 
-    public static class DataBean {
+    public static class DataBean implements Serializable{
         /**
          * user_id : 26834
          * compangy_id : 1321

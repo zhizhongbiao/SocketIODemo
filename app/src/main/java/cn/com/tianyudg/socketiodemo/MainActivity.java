@@ -24,6 +24,7 @@ import java.lang.ref.WeakReference;
 import cn.com.tianyudg.socketiodemo.bean.LoginBean;
 import cn.com.tianyudg.socketiodemo.bean.LoginInfoBean;
 import cn.com.tianyudg.socketiodemo.config.ApiConfig;
+import cn.com.tianyudg.socketiodemo.config.SocketIoConfig;
 import cn.com.tianyudg.socketiodemo.socket_io.SocketService;
 import cn.com.tianyudg.socketiodemo.util.LogUtils;
 import okhttp3.Call;
@@ -48,6 +49,8 @@ public class MainActivity extends AppCompatActivity implements Callback, Service
     private static ProgressDialog progressDialog;
     private SocketService socketService;
     private LoginInfoBean loginInfoBean;
+    private EditText etSocketServerIp;
+    private EditText etHost;
 
 
     @Override
@@ -57,6 +60,8 @@ public class MainActivity extends AppCompatActivity implements Callback, Service
         tvMsg = (TextView) findViewById(R.id.tvMsg);
         etAccount = (EditText) findViewById(R.id.etAccount);
         etPsw = (EditText) findViewById(R.id.etPsw);
+        etHost = (EditText) findViewById(R.id.etHost);
+        etSocketServerIp = (EditText) findViewById(R.id.etSocketServerIp);
         etAccount.setText("13826914162");
         etPsw.setText("888888");
         myHanlder = new MyHanlder(this);
@@ -67,17 +72,29 @@ public class MainActivity extends AppCompatActivity implements Callback, Service
     public void login(View view) {
         String account = etAccount.getText().toString().trim();
         String psw = etPsw.getText().toString().trim();
+        String host = etHost.getText().toString().trim();
+        String ip = etSocketServerIp.getText().toString().trim();
+
+        if (!TextUtils.isEmpty(ip))
+        {
+            SocketIoConfig.SERVER_URL="http://"+ip;
+        }
+
+        if (TextUtils.isEmpty(host))
+        {
+           host=ApiConfig.HOST;
+        }
 
         if (TextUtils.isEmpty(account) || TextUtils.isEmpty(psw)) {
             Toast.makeText(this, "密码或账号错误", Toast.LENGTH_SHORT);
             return;
         }
         progressDialog.show();
-        login(account, psw);
+        login(account, psw,host);
         loginInfoBean = new LoginInfoBean(account, psw);
     }
 
-    private void login(String account, String psw) {
+    private void login(String account, String psw,String host) {
         OkHttpClient okHttpClient = new OkHttpClient.Builder().build();
         FormBody body = new FormBody.Builder()
                 .add("username", account)
@@ -85,7 +102,7 @@ public class MainActivity extends AppCompatActivity implements Callback, Service
                 .build();
 
         Request request = new Request.Builder()
-                .url(ApiConfig.HOST + ApiConfig.API_LOGIN)
+                .url(host + ApiConfig.API_LOGIN)
                 .post(body)
                 .build();
 
